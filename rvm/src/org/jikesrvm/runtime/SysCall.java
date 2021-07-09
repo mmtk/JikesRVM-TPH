@@ -12,16 +12,18 @@
  */
 package org.jikesrvm.runtime;
 
-import org.jikesrvm.VM;
 import org.jikesrvm.annotations.GenerateImplementation;
 import org.jikesrvm.annotations.AlignedSysCallTemplate;
 import org.jikesrvm.annotations.SysCallTemplate;
 import org.jikesrvm.scheduler.RVMThread;
+import org.jikesrvm.VM;
 import org.vmmagic.pragma.Inline;
+import org.vmmagic.pragma.NoInline;
 import org.vmmagic.pragma.Uninterruptible;
 import org.vmmagic.unboxed.Address;
 import org.vmmagic.unboxed.Word;
 import org.vmmagic.unboxed.Extent;
+import org.vmmagic.unboxed.ObjectReference;
 import org.vmmagic.unboxed.Offset;
 
 /**
@@ -485,26 +487,6 @@ public abstract class SysCall {
   @SysCallTemplate
   public abstract void sysStackAlignmentTest();
 
-  @Inline
-  public void sysTestStackAlignment0() {
-    if ((VM.BuildForIA32) && (VM.BuildFor32Addr))
-      test_stack_alignment_0();
-  }
-
-  @AlignedSysCallTemplate
-  public abstract void test_stack_alignment_0();
-
-  @Inline
-  public int sysTestStackAlignment5(int a, int b, int c, int d, int e) {
-    if ((VM.BuildForIA32) && (VM.BuildFor32Addr))
-      return test_stack_alignment_5(a, b, c, d, e);
-    else
-      return a + 2 * b + 3 * c + 4 * d + 5 * e;
-  }
-
-  @AlignedSysCallTemplate
-  public abstract int test_stack_alignment_5(int a, int b, int c, int d, int e);
-
   @SysCallTemplate
   public abstract void sysArgumentPassingTest(long firstLong, long secondLong, long thirdLong, long fourthLong,
       long fifthLong, long sixthLong, long seventhLong, long eightLong, double firstDouble, double secondDouble,
@@ -523,5 +505,176 @@ public abstract class SysCall {
       int thirdInt, int fourthInt, int fifthInt, int sixthInt, int seventhInt,
       int eightInt);
 
-}
+  @Inline
+  public void tphTestStackAlignment0() {
+    if ((VM.BuildForIA32) && (VM.BuildFor32Addr))
+      test_stack_alignment_0();
+  }
 
+  @AlignedSysCallTemplate
+  public abstract void test_stack_alignment_0();
+
+  @Inline
+  public int tphTestStackAlignment5(int a, int b, int c, int d, int e) {
+    // Only supported for 32-bits IA32
+    if ((VM.BuildForIA32) && (VM.BuildFor32Addr))
+      return test_stack_alignment_5(a, b, c, d, e);
+    else
+      return a + 2 * b + 3 * c + 4 * d + 5 * e;
+  }
+
+  @AlignedSysCallTemplate
+  public abstract int test_stack_alignment_5(int a, int b, int c, int d, int e);
+
+  /**
+   * Initialises information about the TPH control collector
+   * @param tls thread local storage of the control collector
+   */
+  @Inline
+  public void tphStartControlCollector(Address tls) {
+    tph_start_control_collector(tls);
+  }
+
+  @AlignedSysCallTemplate
+  public abstract void tph_start_control_collector(Address tls);
+
+  /**
+   * Initiates the TPH GC
+   * @param pointer the JTOC pointer
+   * @param size the maximum size of the heap
+   */
+  @Inline
+  public void tphGCInit(Address pointer, int size) {
+    tph_gc_init(pointer,size);
+  }
+
+  @AlignedSysCallTemplate
+  public abstract void tph_gc_init(Address pointer, int size);
+
+  /**
+   * Binds the thread to TPH
+   * @param tls thread local storage of the mutator thread
+   * @return Address corresponding to start of the TPH structure of the mutator
+   */
+  @Inline
+  public Address tphBindMutator(Address tls) {
+    return tph_bind_mutator(tls);
+  }
+
+  @AlignedSysCallTemplate
+  public abstract Address tph_bind_mutator(Address tls);
+
+  @Inline
+  public boolean tphProcess(byte[] name, byte[] value) {
+    return tph_process(name, value);
+  }
+
+  @AlignedSysCallTemplate
+  public abstract boolean tph_process(byte[] name, byte[] value);
+
+  @Inline
+  public void tphStartWorker(Address tls, Address workerInstance) {
+    tph_start_worker(tls, workerInstance);
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_start_worker(Address tls, Address workerInstance);
+
+  @Inline
+  public void tphEnableCollection(Address tls) {
+    tph_enable_collection(tls);
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_enable_collection(Address tls);
+
+  @Inline
+  public boolean tphWillNeverMove(ObjectReference object) {
+    return tph_will_never_move(object);
+  }
+  @AlignedSysCallTemplate
+  public abstract boolean tph_will_never_move(ObjectReference object);
+
+  @Inline
+  public int tphFreeBytes() {
+    return tph_free_bytes();
+  }
+  @AlignedSysCallTemplate
+  public abstract int tph_free_bytes();
+
+  @Inline
+  public int tphTotalBytes() {
+    return tph_total_bytes();
+  }
+  @AlignedSysCallTemplate
+  public abstract int tph_total_bytes();
+
+  @Inline
+  public boolean tphIsMappedObject(ObjectReference object) {
+    return tph_is_mapped_object(object);
+  }
+  @AlignedSysCallTemplate
+  public abstract boolean tph_is_mapped_object(ObjectReference object);
+
+  @Inline
+  public void tphAddWeakCandidate(Address ref, Address referent) {
+    tph_add_weak_candidate(ref, referent);
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_add_weak_candidate(Address ref, Address referent);
+
+  @Inline
+  public void tphAddSoftCandidate(Address ref, Address referent) {
+    tph_add_soft_candidate(ref, referent);
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_add_soft_candidate(Address ref, Address referent);
+
+  @Inline
+  public void tphAddPhantomCandidate(Address ref, Address referent) {
+    tph_add_phantom_candidate(ref, referent);
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_add_phantom_candidate(Address ref, Address referent);
+
+  @Inline
+  public void tphAddFinalizer(Object object) {
+    tph_add_finalizer(ObjectReference.fromObject(object));
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_add_finalizer(ObjectReference object);
+
+  @Inline
+  public Object tphGetFinalizedObject() {
+    return tph_get_finalized_object().toObject();
+  }
+  @AlignedSysCallTemplate
+  public abstract ObjectReference tph_get_finalized_object();
+
+  @Inline
+  public void tphModifyCheck(ObjectReference object) {
+    tph_modify_check(object);
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_modify_check(ObjectReference object);
+
+  @NoInline
+  public void tphHandleUserCollectionRequest(Address tls) {
+      tph_handle_user_collection_request(tls);
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_handle_user_collection_request(Address tls);
+
+  @Inline
+  public void tphHarnessBegin() {
+    tph_harness_begin();
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_harness_begin();
+
+  @Inline
+  public void tphHarnessEnd() {
+    tph_harness_end();
+  }
+  @AlignedSysCallTemplate
+  public abstract void tph_harness_end();
+
+}
