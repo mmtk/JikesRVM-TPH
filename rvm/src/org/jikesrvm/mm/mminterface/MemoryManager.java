@@ -22,6 +22,7 @@ import static org.mmtk.utility.Constants.MIN_ALIGNMENT;
 import static org.mmtk.utility.heap.layout.HeapParameters.MAX_SPACES;
 
 import java.lang.ref.PhantomReference;
+import java.lang.ref.Reference;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 
@@ -48,6 +49,7 @@ import org.jikesrvm.options.OptionSet;
 import org.jikesrvm.runtime.BootRecord;
 import org.jikesrvm.runtime.Callbacks;
 import org.jikesrvm.runtime.Magic;
+import org.jikesrvm.scheduler.RVMThread;
 import org.mmtk.plan.CollectorContext;
 import org.mmtk.plan.Plan;
 import org.mmtk.policy.Space;
@@ -63,6 +65,7 @@ import org.vmmagic.pragma.Interruptible;
 import org.vmmagic.pragma.NoInline;
 import org.vmmagic.pragma.Pure;
 import org.vmmagic.pragma.Uninterruptible;
+import org.vmmagic.pragma.UninterruptibleNoWarn;
 import org.vmmagic.pragma.Unpreemptible;
 import org.vmmagic.pragma.UnpreemptibleNoWarn;
 import org.vmmagic.unboxed.Address;
@@ -104,6 +107,10 @@ public final class MemoryManager {
    *
    * Initialization
    */
+  @Entrypoint
+  public static int mmEntrypointTest(int a, int b, int c, int d) {
+    return a * b + c + d;
+  }
 
   /**
    * Suppress default constructor to enforce noninstantiability.
@@ -173,6 +180,12 @@ public final class MemoryManager {
     return collectionEnabled;
   }
 
+  @Entrypoint
+  @UninterruptibleNoWarn
+  public static void outOfMemory() {
+    throw RVMThread.getOutOfMemoryError();
+  }
+
   /**
    * Notify the MM that the host VM is now fully booted.
    */
@@ -187,6 +200,47 @@ public final class MemoryManager {
       VM.sysWriteln("Unrecognized command line argument: \"" + arg + "\"");
       VM.sysExit(EXIT_STATUS_BOGUS_COMMAND_LINE_ARG);
     }
+  }
+
+  @Entrypoint
+  @Unpreemptible
+  public static void blockForGC() {
+    RVMThread t = RVMThread.getCurrentThread();
+    t.assertAcceptableStates(RVMThread.IN_JAVA, RVMThread.IN_JAVA_TO_BLOCK);
+    RVMThread.observeExecStatusAtSTW(t.getExecStatus());
+    t.block(RVMThread.gcBlockAdapter);
+  }
+
+  @Entrypoint
+  public static void prepareMutator(RVMThread t) {
+    /*
+     * The collector threads of processors currently running threads
+     * off in JNI-land cannot run.
+     */
+    t.monitor().lockNoHandshake();
+    // are these the only unexpected states?
+    t.assertUnacceptableStates(RVMThread.IN_JNI,RVMThread.IN_NATIVE);
+    int execStatus = t.getExecStatus();
+    // these next assertions are not redundant given the ability of the
+    // states to change asynchronously, even when we're holding the lock, since
+    // the thread may change its own state.  of course that shouldn't happen,
+    // but having more assertions never hurts...
+    if (VM.VerifyAssertions) VM._assert(execStatus != RVMThread.IN_JNI);
+    if (VM.VerifyAssertions) VM._assert(execStatus != RVMThread.IN_NATIVE);
+    if (execStatus == RVMThread.BLOCKED_IN_JNI) {
+      if (false) {
+        VM.sysWriteln("for thread #",t.getThreadSlot()," setting up JNI stack scan");
+        VM.sysWriteln("thread #",t.getThreadSlot()," has top java fp = ",t.getJNIEnv().topJavaFP());
+      }
+
+      /* thread is blocked in C for this GC.
+       Its stack needs to be scanned, starting from the "top" java
+       frame, which has been saved in the running threads JNIEnv.  Put
+       the saved frame pointer into the threads saved context regs,
+       which is where the stack scan starts. */
+      t.contextRegisters.setInnermost(Address.zero(), t.getJNIEnv().topJavaFP());
+    }
+    t.monitor().unlock();
   }
 
   /***********************************************************************
@@ -1048,6 +1102,11 @@ public final class MemoryManager {
   @Interruptible
   public static void addPhantomReference(PhantomReference<?> obj, Object referent) {
     ReferenceProcessor.addPhantomCandidate(obj,ObjectReference.fromObject(referent));
+  }
+
+  @Entrypoint
+  public static void enqueueReference(Address ref) {
+    ((Reference<?>) Magic.addressAsObject(ref)).enqueueInternal();
   }
 
   /***********************************************************************

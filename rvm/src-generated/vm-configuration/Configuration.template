@@ -85,6 +85,9 @@ public abstract class Configuration {
   /** build with Base boot image compiler? */
   public static final boolean BuildWithBaseBootImageCompiler = @_RVM_WITH_BASE_BOOTIMAGE_COMPILER_@;
 
+  /** Is this using the default MMTk or the TPH? **/
+  public static final boolean BuildWithTPH = true;
+
   /** allow bootimage writer to build oversized images? */
   public static final boolean AllowOversizedImages = @_RVM_OVERSIZED_IMAGE_@;
 

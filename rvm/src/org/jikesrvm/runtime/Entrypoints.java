@@ -19,6 +19,7 @@ import org.jikesrvm.VM;
 import org.jikesrvm.classloader.RVMField;
 import org.jikesrvm.classloader.RVMMethod;
 import org.jikesrvm.classloader.NormalMethod;
+import org.jikesrvm.scheduler.RVMThread;
 
 /**
  * Fields and methods of the virtual machine that are needed by
@@ -604,4 +605,73 @@ public class Entrypoints {
         nm == raiseIllegalAccessError;
   }
 
+  // Entrypoints of methods and fields, required by third-party-heap
+  // Note: the commented entrypoints will be implemented in the next PR
+  public static final NormalMethod unblockAllMutatorsForGCMethod =
+      getMethod(org.jikesrvm.scheduler.RVMThread.class, "unblockAllMutatorsForGC", "()V");
+  public static final NormalMethod blockAllMutatorsForGCMethod =
+      getMethod(org.jikesrvm.scheduler.RVMThread.class, "blockAllMutatorsForGC", "()V");
+  public static final RVMField threadBySlotField =
+      getField(org.jikesrvm.scheduler.RVMThread.class, "threadBySlot", RVMThread[].class);
+  public static final NormalMethod blockForGCMethod =
+      getMethod(org.jikesrvm.mm.mminterface.MemoryManager.class, "blockForGC", "()V");
+  public static final NormalMethod prepareMutatorMethod =
+      getMethod(org.jikesrvm.mm.mminterface.MemoryManager.class, "prepareMutator", "(Lorg/jikesrvm/scheduler/RVMThread;)V");
+  // public static final NormalMethod scanBootImageMethod =
+  //     getMethod(org.jikesrvm.mm.mminterface.TPHScanning.class, "scanBootImage", "(Lorg/vmmagic/unboxed/Address;)V");
+  public static final NormalMethod mmEntrypointTestMethod =
+      getMethod(org.jikesrvm.mm.mminterface.MemoryManager.class, "mmEntrypointTest", "(IIII)I");
+  public static final NormalMethod dumpRefMethod =
+      getMethod(org.jikesrvm.mm.mminterface.DebugUtil.class, "dumpRef", "(Lorg/vmmagic/unboxed/ObjectReference;)V");
+  // public static final NormalMethod spawnCollectorThreadMethod =
+  //     getMethod(org.jikesrvm.mm.mminterface.MemoryManager.class, "spawnCollectorThread", "(Lorg/vmmagic/unboxed/Address;)V");
+  public static final NormalMethod outOfMemoryMethod =
+      getMethod(org.jikesrvm.mm.mminterface.MemoryManager.class, "outOfMemory", "()V");
+  public static final NormalMethod snipObsoleteCompiledMethodsMethod =
+      getMethod(org.jikesrvm.compilers.common.CompiledMethods.class, "snipObsoleteCompiledMethods", "()V");
+  public static final NormalMethod getNumberOfReferenceSlotsMethod =
+      getMethod(org.jikesrvm.runtime.Statics.class, "getNumberOfReferenceSlots", "()I");
+  public static final NormalMethod implementedInJavaMethod =
+      getMethod(org.jikesrvm.jni.JNIGenericHelpers.class, "implementedInJava", "(I)Z");
+  public static final NormalMethod enqueueReferenceMethod =
+      getMethod(org.jikesrvm.mm.mminterface.MemoryManager.class, "enqueueReference", "(Lorg/vmmagic/unboxed/Address;)V");
+
+  public static final RVMField numThreadsField =
+      getField(org.jikesrvm.scheduler.RVMThread.class, "numThreads", int.class);
+  // public static final RVMField isCollectorField =
+  //     getField(org.jikesrvm.mm.mminterface.ThreadContext.class, "isTPHCollector", boolean.class);
+  public static final RVMField threadsField =
+      getField(org.jikesrvm.scheduler.RVMThread.class, "threads", org.jikesrvm.scheduler.RVMThread[].class);
+  public static final RVMField JNIFunctionsField =
+      getField(org.jikesrvm.jni.JNIEnvironment.class, "JNIFunctions", org.jikesrvm.jni.FunctionTable.class);
+  public static final RVMField linkageTripletsField =
+      getField(org.jikesrvm.jni.JNIEnvironment.class, "linkageTriplets", org.jikesrvm.jni.LinkageTripletTable.class);
+  public static final RVMField JNIGlobalRefsField2 =
+      getField(org.jikesrvm.jni.JNIGlobalRefTable.class,"JNIGlobalRefs", org.vmmagic.unboxed.AddressArray.class);
+  public static final RVMField bootImageDataStartField =
+      getField(org.jikesrvm.runtime.BootRecord.class, "bootImageDataStart", org.vmmagic.unboxed.Address.class);
+  public static final RVMField bootImageRMapStart =
+      getField(org.jikesrvm.runtime.BootRecord.class, "bootImageRMapStart", org.vmmagic.unboxed.Address.class);
+  public static final RVMField bootImageRMapEnd =
+      getField(org.jikesrvm.runtime.BootRecord.class, "bootImageRMapEnd", org.vmmagic.unboxed.Address.class);
+  public static final RVMField activeMutatorContextField =
+      getField(org.jikesrvm.scheduler.RVMThread.class, "activeMutatorContext", boolean.class);
+  // public static final RVMField tphHandleField =
+  //     getField(org.jikesrvm.mm.mminterface.Selected.Mutator.class, "tphHandle", org.vmmagic.unboxed.Address.class);
+
+  public static final RVMField isClassTypeField =
+      getField(org.jikesrvm.classloader.RVMType.class, "isClassType", boolean.class);
+  public static final RVMField isArrayTypeField =
+      getField(org.jikesrvm.classloader.RVMType.class, "isArrayType", boolean.class);
+  public static final RVMField instanceSizeField =
+      getField(org.jikesrvm.classloader.RVMClass.class, "instanceSize", int.class);
+  public static final RVMField logElementSizeField =
+      getField(org.jikesrvm.classloader.RVMArray.class, "logElementSize", int.class);
+  public static final RVMField referenceOffsetsField =
+      getField(org.jikesrvm.classloader.RVMType.class, "referenceOffsets", int[].class);
+
+  public static final RVMField rvmClassAlignment =
+      getField(org.jikesrvm.classloader.RVMClass.class, "alignment", int.class);
+  public static final RVMField rvmArrayAlignment =
+      getField(org.jikesrvm.classloader.RVMArray.class, "alignment", int.class);
 }

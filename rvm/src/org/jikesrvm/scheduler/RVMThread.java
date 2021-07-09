@@ -1178,6 +1178,7 @@ public final class RVMThread extends ThreadContext {
   protected int inDumpStack = 0;
 
   /** Is this a "registered mutator?" */
+  @Entrypoint
   public boolean activeMutatorContext = false;
 
   /** Lock used for dumping stack and such. */
@@ -1204,6 +1205,7 @@ public final class RVMThread extends ThreadContext {
    * thread array - all threads are stored in this array according to their
    * threadSlot.
    */
+  @Entrypoint
   public static RVMThread[] threadBySlot = new RVMThread[MAX_THREADS];
 
   /**
@@ -1280,6 +1282,7 @@ public final class RVMThread extends ThreadContext {
   /**
    * Number of threads in the system (some of which may not be active).
    */
+  @Entrypoint
   public static int numThreads;
 
   /**
@@ -1291,6 +1294,7 @@ public final class RVMThread extends ThreadContext {
    * Note further that threads remain in this array even after the Java
    * libraries no longer consider the thread to be active.
    */
+  @Entrypoint(fieldMayBeFinal = true)
   public static final RVMThread[] threads = new RVMThread[MAX_THREADS];
 
   /**
@@ -3963,6 +3967,7 @@ public final class RVMThread extends ThreadContext {
    * Fixpoint until there are no threads that we haven't blocked. Fixpoint is needed to
    * catch the (unlikely) case that a thread spawns another thread while we are waiting.
    */
+  @Entrypoint
   @NoCheckStore
   @Unpreemptible
   public static void blockAllMutatorsForGC() {
@@ -4017,6 +4022,7 @@ public final class RVMThread extends ThreadContext {
   /**
    * Unblock all mutators blocked for GC.
    */
+  @Entrypoint
   @NoCheckStore
   @Unpreemptible
   public static void unblockAllMutatorsForGC() {

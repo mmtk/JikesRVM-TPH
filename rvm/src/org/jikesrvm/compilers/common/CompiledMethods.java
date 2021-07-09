@@ -27,6 +27,7 @@ import org.jikesrvm.jni.JNICompiledMethod;
 import org.jikesrvm.runtime.Magic;
 import org.jikesrvm.runtime.Memory;
 import org.jikesrvm.util.Services;
+import org.vmmagic.pragma.Entrypoint;
 import org.vmmagic.pragma.Uninterruptible;
 import org.vmmagic.unboxed.Address;
 
@@ -219,6 +220,7 @@ public class CompiledMethods {
    * NOTE: It's expected that this is processed during GC, after scanning
    *    stacks to determine which methods are currently executing.
    */
+  @Entrypoint
   @Uninterruptible
   public static void snipObsoleteCompiledMethods() {
     Magic.combinedLoadBarrier();

@@ -737,40 +737,61 @@ public abstract class RVMType extends AnnotatedElement {
   @Uninterruptible
   public abstract Offset getThinLockOffset();
 
+  @Entrypoint
+  protected boolean isClassType = false;
+  @Entrypoint
+  protected boolean isArrayType = false;
+  @Entrypoint
+  protected boolean isPrimitiveType = false;
+  @Entrypoint
+  protected boolean isUnboxedType = false;
+  @Entrypoint
+  protected boolean isReferenceType = false;
+
   /**
    * Is this is an instance of RVMClass?
    * @return whether or not this is an instance of RVMClass?
    */
   @Uninterruptible
-  public abstract boolean isClassType();
+  public boolean isClassType() {
+    return isClassType;
+  }
 
   /**
    * Is this an instance of RVMArray?
    * @return whether or not this is an instance of RVMArray?
    */
   @Uninterruptible
-  public abstract boolean isArrayType();
+  public boolean isArrayType() {
+    return isArrayType;
+  }
 
   /**
    * Is this a primitive type?
    * @return whether or not this is a primitive type
    */
   @Uninterruptible
-  public abstract boolean isPrimitiveType();
+  public boolean isPrimitiveType() {
+    return isPrimitiveType;
+  }
 
   /**
    * Is this an unboxed type?
    * @return whether or not this is an unboxed type
    */
   @Uninterruptible
-  public abstract boolean isUnboxedType();
+  public boolean isUnboxedType() {
+    return isUnboxedType;
+  }
 
   /**
    * Is this a reference type?
    * @return whether or not this is a reference (ie non-primitive) type.
    */
   @Uninterruptible
-  public abstract boolean isReferenceType();
+  public boolean isReferenceType() {
+    return isReferenceType;
+  }
 
   /**
    * @param type type to checj
@@ -906,6 +927,7 @@ public abstract class RVMType extends AnnotatedElement {
    * In a class with pointers, it contains the offsets of
    * reference-containing instance fields
    */
+  @Entrypoint
   protected int[] referenceOffsets;
 
   /**

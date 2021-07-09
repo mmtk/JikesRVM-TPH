@@ -136,11 +136,14 @@ public class BootRecord {
   /**
    * address at which image is to be loaded into memory
    */
+  @Entrypoint
   public Address bootImageDataStart;
   public Address bootImageDataEnd;
   public Address bootImageCodeStart;
   public Address bootImageCodeEnd;
+  @Entrypoint
   public Address bootImageRMapStart;
+  @Entrypoint
   public Address bootImageRMapEnd;
 
   /**
@@ -233,7 +236,7 @@ public class BootRecord {
   public Address sysConsoleWriteDoubleIP;
   public Address sysConsoleFlushErrorAndTraceIP;
 
-  // TPH system calls
+  // TPH functions
   public Address test_stack_alignment_0RIP;
   public Address test_stack_alignment_5RIP;
 

@@ -61,6 +61,7 @@ public final class JNIEnvironment {
    * to invoke methods in @link{JNIFunctions}.
    */
   @Untraced // because bootloader code must be able to access it
+  @Entrypoint
   public static FunctionTable JNIFunctions;
 
   /**
@@ -68,6 +69,7 @@ public final class JNIEnvironment {
    * a function pointer.
    * This is an array of such triples that matches JNIFunctions.
    */
+  @Entrypoint
   public static LinkageTripletTable linkageTriplets;
 
   /**
