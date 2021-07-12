@@ -12,15 +12,21 @@
  */
 package org.jikesrvm.mm.mminterface;
 
+import org.jikesrvm.VM;
 import org.jikesrvm.mm.mmtk.ScanThread;
+import org.jikesrvm.runtime.Magic;
 import org.jikesrvm.scheduler.SystemThread;
 import org.mmtk.plan.CollectorContext;
 import org.vmmagic.pragma.BaselineNoRegisters;
 import org.vmmagic.pragma.BaselineSaveLSRegisters;
+import org.vmmagic.pragma.Entrypoint;
 import org.vmmagic.pragma.NoOptCompile;
 import org.vmmagic.pragma.NonMoving;
 import org.vmmagic.pragma.Uninterruptible;
 import org.vmmagic.pragma.Unpreemptible;
+import org.vmmagic.unboxed.Address;
+
+import static org.jikesrvm.runtime.SysCall.sysCall;
 
 /**
  * System thread used to perform garbage collection work.
@@ -37,6 +43,17 @@ public final class CollectorThread extends SystemThread {
    *
    * Instance variables
    */
+  
+  /**
+   * stores the address of a TPH worker thread, or zero if this is a controller thread
+   */
+  @Entrypoint
+  private Address tphWorkerInstance = Address.zero();
+
+  public void setTPHWorker(Address tphWorker) {
+    rvmThread.assertIsTPHCollector();
+    tphWorkerInstance = tphWorker;
+  }
 
   /** used by collector threads to hold state during stack scanning */
   private final ScanThread threadScanner = new ScanThread();
@@ -58,9 +75,11 @@ public final class CollectorThread extends SystemThread {
    *  functionality
    */
   public CollectorThread(byte[] stack, CollectorContext context) {
-    super(stack, context.getClass().getName() + " [" + nextId + "]");
-    rvmThread.collectorContext = context;
-    rvmThread.collectorContext.initCollector(nextId);
+    super(stack, (VM.BuildWithTPH ? "CollectorThread" : context.getClass().getName()) + " [" + nextId + "]");
+    if (!VM.BuildWithTPH) {
+      rvmThread.collectorContext = context;
+      rvmThread.collectorContext.initCollector(nextId);
+    }
     nextId++;
   }
 
@@ -79,7 +98,15 @@ public final class CollectorThread extends SystemThread {
   // and store all registers from previous method in prologue, so that we can stack access them while scanning this thread.
   @Unpreemptible
   public void run() {
-    rvmThread.collectorContext.run();
+    if (VM.BuildWithTPH) {
+      if (workerInstance.EQ(Address.zero())) {
+        sysCall.tphStartControlCollector(Magic.objectAsAddress(rvmThread));
+      } else {
+        sysCall.tphStartWorker(Magic.objectAsAddress(rvmThread), tphWorkerInstance);
+      }
+    } else {
+      rvmThread.collectorContext.run();
+    }
   }
 }
 

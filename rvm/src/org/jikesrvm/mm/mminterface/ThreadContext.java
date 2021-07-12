@@ -13,6 +13,7 @@
 package org.jikesrvm.mm.mminterface;
 
 import org.mmtk.plan.CollectorContext;
+import org.vmmagic.pragma.Entrypoint;
 import org.vmmagic.pragma.Uninterruptible;
 
 /**
@@ -21,13 +22,20 @@ import org.vmmagic.pragma.Uninterruptible;
 @Uninterruptible
 public abstract class ThreadContext extends Selected.Mutator {
   protected CollectorContext collectorContext;
+  
+  @Entrypoint
+  private boolean isTPHCollector = false;
+
+  public void assertIsTPHCollector() {
+    isTPHCollector = true;
+  }
 
   public final CollectorContext getCollectorContext() {
     return collectorContext;
   }
 
   public final boolean isCollectorThread() {
-    return collectorContext != null;
+    return collectorContext != null || isTPHCollector;
   }
 }
 

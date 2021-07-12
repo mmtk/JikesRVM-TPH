@@ -135,6 +135,12 @@ public final class MemoryManager {
     Selected.Plan.get().enableAllocation();
     SynchronizedCounter.boot();
 
+    if (VM.BuildWithTPH) {
+      sysCall.tphGCInit(BootRecord.the_boot_record.tocRegister, theBootRecord.maximumHeapSize.toInt());
+      RVMThread.threadBySlot[1].setHandle(sysCall
+              .tphBindMutator(Magic.objectAsAddress(RVMThread.threadBySlot[1])));
+    }
+
     Callbacks.addExitMonitor(new Callbacks.ExitMonitor() {
       @Override
       public void notifyExit(int value) {
@@ -152,15 +158,17 @@ public final class MemoryManager {
    */
   @Interruptible
   public static void postBoot() {
-    Selected.Plan.get().processOptions();
+    if (!VM.BuildWithTPH) {
+      Selected.Plan.get().processOptions();
 
-    if (Options.noReferenceTypes.getValue()) {
-      RVMType.JavaLangRefReferenceReferenceField.makeTraced();
-    }
+      if (Options.noReferenceTypes.getValue()) {
+        RVMType.JavaLangRefReferenceReferenceField.makeTraced();
+      }
 
-    if (VM.BuildWithGCSpy) {
-      // start the GCSpy interpreter server
-      MemoryManager.startGCspyServer();
+      if (VM.BuildWithGCSpy) {
+        // start the GCSpy interpreter server
+        MemoryManager.startGCspyServer();
+      }
     }
   }
 
@@ -169,8 +177,21 @@ public final class MemoryManager {
    */
   @Interruptible
   public static void enableCollection() {
-    Selected.Plan.get().enableCollection();
+    if (VM.BuildWithTPH) {
+      sysCall.tphEnableCollection(Magic.objectAsAddress(RVMThread.getCurrentThread()));
+    } else {
+      Selected.Plan.get().enableCollection();
+    }
     collectionEnabled = true;
+  }
+
+  @Interruptible
+  @Entrypoint
+  public static void spawnCollectorThread(Address tphWorkerInstance) {
+    byte[] stack = MemoryManager.newStack(StackFrameLayout.getStackSizeCollector());
+    CollectorThread t = new CollectorThread(stack, null);
+    t.setTPHWorker(tphWorkerInstance);
+    t.start();
   }
 
   /**
@@ -260,15 +281,19 @@ public final class MemoryManager {
     /* Make sure that during GC, we don't update on a possibly moving object.
        Such updates are dangerous because they can be lost.
      */
-    if (Plan.gcInProgressProper()) {
-      ObjectReference ref = ObjectReference.fromObject(object);
-      if (Space.isMovable(ref)) {
-        VM.sysWriteln("GC modifying a potentially moving object via Java (i.e. not magic)");
-        VM.sysWriteln("  obj = ", ref);
-        RVMType t = Magic.getObjectType(object);
-        VM.sysWrite(" type = ");
-        VM.sysWriteln(t.getDescriptor());
-        VM.sysFail("GC modifying a potentially moving object via Java (i.e. not magic)");
+    if (VM.BuildWithTPH) {
+      sysCall.tphModifyCheck(ObjectReference.fromObject(object));
+    } else {
+      if (Plan.gcInProgressProper()) {
+        ObjectReference ref = ObjectReference.fromObject(object);
+        if (Space.isMovable(ref)) {
+          VM.sysWriteln("GC modifying a potentially moving object via Java (i.e. not magic)");
+          VM.sysWriteln("  obj = ", ref);
+          RVMType t = Magic.getObjectType(object);
+          VM.sysWrite(" type = ");
+          VM.sysWriteln(t.getDescriptor());
+          VM.sysFail("GC modifying a potentially moving object via Java (i.e. not magic)");
+        }
       }
     }
   }
@@ -289,7 +314,11 @@ public final class MemoryManager {
    * @return The amount of free memory.
    */
   public static Extent freeMemory() {
-    return Plan.freeMemory();
+    if (VM.BuildWithTPH) {
+      return Extent.fromIntZeroExtend(sysCall.tphFreeBytes());
+    } else {
+      return Plan.freeMemory();
+    }
   }
 
   /**
@@ -298,7 +327,11 @@ public final class MemoryManager {
    * @return The amount of total memory.
    */
   public static Extent totalMemory() {
-    return Plan.totalMemory();
+    if (VM.BuildWithTPH) {
+      return Extent.fromIntZeroExtend(sysCall.tphTotalBytes());
+    } else {
+      return Plan.totalMemory();
+    }
   }
 
   /**
@@ -315,7 +348,11 @@ public final class MemoryManager {
    */
   @Interruptible
   public static void gc() {
-    Selected.Plan.handleUserCollectionRequest();
+    if (VM.BuildWithTPH) {
+      sysCall.tphHandleUserCollectionRequest(Magic.objectAsAddress(RVMThread.getCurrentThread()));
+    } else {
+      Selected.Plan.handleUserCollectionRequest();
+    }
   }
 
   /****************************************************************************
@@ -355,7 +392,11 @@ public final class MemoryManager {
    */
   @Inline
   public static boolean addressInVM(Address address) {
-    return Space.isMappedAddress(address);
+    if (VM.BuildWithTPH) {
+      return sysCall.tphIsMappedAddress(address);
+    } else {
+      return Space.isMappedAddress(address);
+    }
   }
 
   /**
@@ -371,7 +412,11 @@ public final class MemoryManager {
    */
   @Inline
   public static boolean objectInVM(ObjectReference object) {
-    return Space.isMappedObject(object);
+    if (VM.BuildWithTPH) {
+      return sysCall.tphIsMappedObject(object);
+    } else {
+      return Space.isMappedObject(object);
+    }
   }
 
   /**
@@ -384,7 +429,11 @@ public final class MemoryManager {
     // In general we don't know which spaces may hold allocated stacks.
     // If we want to be more specific than the space being mapped we
     // will need to add a check in Plan that can be overriden.
-    return Space.isMappedAddress(address);
+    if (VM.BuildWithTPH) {
+      return sysCall.tphIsMappedAddress(address);
+    } else {
+      return Space.isMappedAddress(address);
+    }
   }
   /***********************************************************************
    *
@@ -665,6 +714,7 @@ public final class MemoryManager {
   @Inline
   public static Address allocateSpace(CollectorContext context, int bytes, int align, int offset, int allocator,
                                       ObjectReference from) {
+    if (VM.VERIFY_ASSERTIONS) VM.assertions._assert(!VM.BuildWithTPH);
     /* MMTk requests must be in multiples of MIN_ALIGNMENT */
     bytes = org.jikesrvm.runtime.Memory.alignUp(bytes, MIN_ALIGNMENT);
 
@@ -1027,7 +1077,11 @@ public final class MemoryManager {
    */
   @Pure
   public static boolean willNeverMove(Object obj) {
-    return Selected.Plan.get().willNeverMove(ObjectReference.fromObject(obj));
+    if (VM.BuildWithTPH) {
+      return sysCall.tphWillNeverMove(ObjectReference.fromObject(obj));
+    } else {
+      return Selected.Plan.get().willNeverMove(ObjectReference.fromObject(obj));
+    }
   }
 
   /**
@@ -1079,7 +1133,11 @@ public final class MemoryManager {
    */
   @Interruptible
   public static void addSoftReference(SoftReference<?> obj, Object referent) {
-    ReferenceProcessor.addSoftCandidate(obj,ObjectReference.fromObject(referent));
+    if (VM.BuildWithTPH) {
+      sysCall.tphAddSoftCandidate(Magic.objectAsAddress(obj), Magic.objectAsAddress(referent));
+    } else {
+      ReferenceProcessor.addSoftCandidate(obj, ObjectReference.fromObject(referent));
+    }
   }
 
   /**
@@ -1090,7 +1148,11 @@ public final class MemoryManager {
    */
   @Interruptible
   public static void addWeakReference(WeakReference<?> obj, Object referent) {
-    ReferenceProcessor.addWeakCandidate(obj,ObjectReference.fromObject(referent));
+    if (VM.BuildWithTPH) {
+      sysCall.tphAddWeakCandidate(Magic.objectAsAddress(obj), Magic.objectAsAddress(referent));
+    } else {
+      ReferenceProcessor.addWeakCandidate(obj, ObjectReference.fromObject(referent));
+    }
   }
 
   /**
@@ -1101,7 +1163,11 @@ public final class MemoryManager {
    */
   @Interruptible
   public static void addPhantomReference(PhantomReference<?> obj, Object referent) {
-    ReferenceProcessor.addPhantomCandidate(obj,ObjectReference.fromObject(referent));
+    if (VM.BuildWithTPH) {
+      sysCall.tphAddPhantomCandidate(Magic.objectAsAddress(obj), Magic.objectAsAddress(referent));
+    } else {
+      ReferenceProcessor.addPhantomCandidate(obj, ObjectReference.fromObject(referent));
+    }
   }
 
   @Entrypoint
@@ -1153,9 +1219,15 @@ public final class MemoryManager {
    */
   @Inline
   public static boolean mightBeTIB(ObjectReference obj) {
-    return !obj.isNull() &&
-           Space.isMappedObject(obj) &&
-           Space.isMappedObject(ObjectReference.fromObject(ObjectModel.getTIB(obj)));
+    if (VM.BuildWithTPH) {
+      return !obj.isNull() && 
+            sysCall.tphIsMappedObject(obj) &&
+            sysCall.tphIsMappedObject(ObjectReference.fromObject(ObjectModel.getTIB(obj)));
+    } else {
+      return !obj.isNull() &&
+            Space.isMappedObject(obj) &&
+            Space.isMappedObject(ObjectReference.fromObject(ObjectModel.getTIB(obj)));
+    }
   }
 
   /**

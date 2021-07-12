@@ -55,6 +55,23 @@ public class DebugUtil {
   }
 
   /**
+   * Check if an address is a mapped heap object.
+   * @param ref the address to check.
+   * @return {@code true} if address is a mapped object.
+   */
+  @Uninterruptible
+  private static boolean isMappedObject(ObjectReference ref) {
+    if (VM.BuildWithTPH) {
+      if (VM.VerifyAssertions && addrInBootImage(ref.toAddress())) {
+        VM._assert(sysCall.tphIsMappedObject(ref));
+      }
+      return sysCall.tphIsMappedObject(ref);
+    } else {
+      return Space.isMappedObject(ref);
+    }
+  }
+
+  /**
    * Check if an address appears to point to an instance of RVMType
    *
    * @param typeAddress the address to check
@@ -63,7 +80,7 @@ public class DebugUtil {
    */
   @Uninterruptible
   public static boolean validType(ObjectReference typeAddress) {
-    if (!Space.isMappedObject(typeAddress)) {
+    if (!isMappedObject(typeAddress)) {
       return false;  // type address is outside of heap
     }
 
@@ -98,11 +115,12 @@ public class DebugUtil {
   public static boolean validRef(ObjectReference ref) {
 
     if (ref.isNull()) return true;
-    if (!Space.isMappedObject(ref)) {
+    if (!isMappedObject(ref)) {
       VM.sysWrite("validRef: REF outside heap, ref = ");
       VM.sysWrite(ref);
       VM.sysWriteln();
-      Space.printVMMap();
+      if (!VM.BuildWithTPH)
+        Space.printVMMap();
       return false;
     }
     if (MOVES_OBJECTS) {
@@ -118,13 +136,14 @@ public class DebugUtil {
 
     TIB tib = ObjectModel.getTIB(ref);
     Address tibAddr = Magic.objectAsAddress(tib);
-    if (!Space.isMappedObject(ObjectReference.fromObject(tib))) {
+    if (!isMappedObject(ObjectReference.fromObject(tib))) {
       VM.sysWrite("validRef: TIB outside heap, ref = ");
       VM.sysWrite(ref);
       VM.sysWrite(" tib = ");
       VM.sysWrite(tibAddr);
       VM.sysWriteln();
-      ObjectModel.dumpHeader(ref);
+      if (VM.BuildWithTPH)
+        ObjectModel.dumpHeader(ref);
       return false;
     }
     if (tibAddr.isZero()) {
@@ -161,7 +180,11 @@ public class DebugUtil {
 
   @Uninterruptible
   public static boolean mappedVMRef(ObjectReference ref) {
-    return Space.isMappedObject(ref) && HeapLayout.mmapper.objectIsMapped(ref);
+    if (VM.BuildWithRustMMTk) {
+      return isMappedObject(ref);
+    } else {
+      return isMappedObject(ref) && HeapLayout.mmapper.objectIsMapped(ref);
+    }
   }
 
   @Uninterruptible
